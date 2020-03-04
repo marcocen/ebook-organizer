@@ -3,7 +3,7 @@ import os
 import requests
 import json
 import argparse
-from shutil import copyfile
+from shutil import copy
 
 from datetime import datetime
 
@@ -48,4 +48,6 @@ for file in files:
     print("Authors: {}".format(authors))
     print("Published: {}".format(published))
     newtitle = "{} - {} ({})".format(authors, title, published)
-    copyfile("{}/{}".format(path, file), "{}/{}{}".format(args.out_dir, newtitle, fileext))
+    sourcefile = os.path.join(path, file)
+    destfile = os.path.join(args.out_dir, "{}{}".format(newtitle, fileext))
+    copy(sourcefile, destfile)
