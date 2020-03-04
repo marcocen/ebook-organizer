@@ -4,7 +4,7 @@ import requests
 import json
 import argparse
 from shutil import copy
-
+from dateutil.parser import parse
 from datetime import datetime
 
 parser = argparse.ArgumentParser()
@@ -14,15 +14,26 @@ parser.add_argument("-i", "--in-dir",
 parser.add_argument("-o", "--out-dir",
                     help="Directory where the books will be organized",
                     required=True)
-parser.add_argument("-s", "--subdirs",
-                    help="Organize books in subdirectories",
-                    action='store_true')
+parser.add_argument("-t", "--template",
+                    help="Template for the filename",
+                    default="%a - %t (%y)")
 args = parser.parse_args()
 
 path = args.in_dir
+outdir = args.out_dir
 files = os.listdir(path)
 files404 = []
 api_url = "https://www.googleapis.com/books/v1"
+template = args.template
+
+template_vars = {
+    '%a': 'author',
+    '%t': 'title',
+    '%y': 'year',
+    '%s': 'subtitle',
+    '%p': 'publisher',
+    '%i': 'isbn'
+}
 
 def search_book(file):
     filename = os.path.splitext(file)[0]
@@ -32,23 +43,48 @@ def search_book(file):
         return []
     return volumes['items'][0]['volumeInfo']
 
-def new_filename(volumeInfo):
-    title = volumeInfo['title']
-    authors = str.join(', ', volumeInfo['authors'])
-    published = datetime.strptime(volumeInfo['publishedDate'], '%Y-%m-%d').year
-    return "{} - {} ({})".format(authors, title, published)
+def new_filename(volumeInfo, fileExt, template):
+    volumeInfo['year'] = str(parse(volumeInfo['publishedDate']).year)
+    volumeInfo['isbn'] = list(filter(lambda x: x['type']=="ISBN_13", volumeInfo["industryIdentifiers"]))[0]['identifier']
+    volumeInfo['author'] = str.join(', ', volumeInfo['authors'])
+    title = template
+    for k,v in template_vars.items():
+        if v in volumeInfo.keys():
+            title = title.replace(k, volumeInfo[v])
+        else:
+            title = title.replace(k, "")
+    return "{}{}".format(title, fileExt)
+
+def archive_file(sourceFile, destFile):
+    print("{} ~> {}".format(sourcefile, destfile))
+    if not os.path.isdir(os.path.dirname(destfile)):
+        os.mkdir(os.path.dirname(destfile))
+    copy(sourcefile, destfile)
+
+def file_is_ebook(file):
+    formats = [
+        '.pdf',
+        '.epub',
+        '.mobi',
+        '.azw',
+        '.azw3',
+        '.iba',
+        '.djvu',
+        '.rtf'
+    ]
+    return os.path.splitext(file)[1].lower() in formats
 
 for file in files:
+    if not file_is_ebook(file):
+        continue
+    fileext = os.path.splitext(file)[1]
     volumeInfo = search_book(file)
     if not volumeInfo:
         files404.append(file)
         continue
-    fileext = os.path.splitext(file)[1]
-    newname = new_filename(volumeInfo)
-    destfile = os.path.join(args.out_dir, "{}{}".format(newname,fileext))
+    destfile = os.path.join(outdir, new_filename(volumeInfo, fileext, args.template))
     sourcefile = os.path.join(path, file)
-    print("{} ~> {}".format(sourcefile, destfile))
-    copy(sourcefile, destfile)
+    archive_file(sourcefile, destfile)
 
 if files404:
     print("Couldn't find info for {} files.".format(len(files404)))
@@ -62,8 +98,6 @@ if files404:
             if newname == "":
                 continue
             fileext = os.path.splitext(file)[1]
-            newname = new_filename(volumeInfo)
-            destfile = os.path.join(args.out_dir, "{}{}".format(newname,fileext))
+            destfile = os.path.join(outdir, new_filename(volumeInfo, fileext, args.template))
             sourcefile = os.path.join(path, file)
-            print("{} ~> {}".format(sourcefile, destfile))
-            copy(sourcefile, destfile)
+            archive_file(sourcefile, destfile)
