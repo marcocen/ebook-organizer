@@ -25,7 +25,6 @@ files = os.listdir(path)
 
 api_url = "https://www.googleapis.com/books/v1"
 for file in files:
-    print(file)
     filename = os.path.splitext(file)[0]
     fileext = os.path.splitext(file)[1]
     r=requests.get("{}/volumes?q={}&format=json".format(api_url, filename))
@@ -44,10 +43,8 @@ for file in files:
     title = volumeInfo['title']
     authors = str.join(', ', volumeInfo['authors'])
     published = datetime.strptime(volumeInfo['publishedDate'], '%Y-%m-%d').year
-    print("Title: {}".format(title))
-    print("Authors: {}".format(authors))
-    print("Published: {}".format(published))
     newtitle = "{} - {} ({})".format(authors, title, published)
     sourcefile = os.path.join(path, file)
     destfile = os.path.join(args.out_dir, "{}{}".format(newtitle, fileext))
+    print("{} ~> {}".format(sourcefile, destfile))
     copy(sourcefile, destfile)
